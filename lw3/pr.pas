@@ -27,19 +27,30 @@ PROGRAM WorkWithFoldersInTree(INPUT, OUTPUT);
    6) Если мы вырезали папку, то для вставки нужно нажать Enter
       Папка вставится ниже выбранной папки.
    7) Сохранять файл - клавиша F10.    
+   8) Выход из программы - SHIFT + TAB.
 }
 USES
   CRT;
 CONST
-  NO_FILE = 'Íå óêàçàí èñõîäíûé ôàéë';
-  ERROR_OPEN_FILE = 'Îøèáêà îòêðûòèÿ ôàéëà ';
+  NO_FILE = 'Не указан исходный файл';
+  ERROR_OPEN_FILE = 'Ошибка открытия файла ';
   LVL = '+';
-  WRITE_NEW_NODE_NAME = 'Ââåäèòå èìÿ íîâîé ïàïêè èëè ôàéëà: ';
-  WRITE_NEW_NAME_FOR_NODE = 'Ââåäèòå äðóãîå èìÿ: ';
-  MY_COMPUTER = 'Ìîé êîìïüþòåð';
+  WRITE_NEW_NODE_NAME = 'Введите имя новой папки или файла: ';
+  WRITE_NEW_NAME_FOR_NODE = 'Введите другое имя: ';
+  MY_COMPUTER = 'Мой компьютер';
   ARROW = ' -> ';
   EMPTY_ARROW = '    ';
-  SAVE_ALERT = 'Ñîõðàíåíèå ïðîøëî óñïåøíî!';
+  SAVE_ALERT = 'Сохранение прошло успешно!';
+  CONTROL = '  Управление - стрелки';
+  NEW_FOLDER = '  Создание новой папки - TAB';
+  DEL = '  Удаление - Delete';
+  RENAME = '  Переименование - F2';
+  CUT = '  Вырезание - Ctrl + X';
+  COPY = '  Копирование - F4';
+  INSERT = '  Вставка - Enter';
+  SAVE = '  Сохранение - F10';
+  EXIT = '  Выход - SHIFT + TAB';
+  
 TYPE
   Pointer = ^Node;
   Node = RECORD
@@ -140,7 +151,7 @@ VAR
   NewNode: Pointer;
 BEGIN
   NEW(NewNode);
-  NewNode^.Val := Copy(CurrentValue, 1, Length(CurrentValue));
+  NewNode^.Val := CurrentValue;
   NewNode^.Lvl := LvlCtr;
   NewNode^.IsSelection := FALSE;
   NewNode^.Left := NIL;
@@ -227,6 +238,20 @@ BEGIN
       SaveTree(FOut, Ptr^.Left);
       SaveTree(FOut, Ptr^.Right);
     END;
+END;
+
+PROCEDURE PrintTree(Ptr: Pointer);
+VAR
+  I: INTEGER;
+BEGIN   
+  IF Ptr <> NIL
+  THEN  
+    BEGIN
+      FOR I := 1 TO Ptr^.Lvl DO WRITE(LVL);
+      WRITELN(Ptr^.Val);
+      PrintTree(Ptr^.Left);
+      PrintTree(Ptr^.Right);
+    END;
 END; 
 
 PROCEDURE WriteMenuList(StartNode: Pointer);
@@ -249,12 +274,27 @@ BEGIN
     END;
 END;
 
+PROCEDURE WriteHelpBox();
+BEGIN
+  WRITELN(CONTROL);
+  WRITELN(NEW_FOLDER);
+  WRITELN(DEL);
+  WRITELN(RENAME);
+  WRITELN(CUT);
+  WRITELN(COPY);
+  WRITELN(INSERT);
+  WRITELN(SAVE);
+  WRITELN(EXIT);
+  WRITELN;
+END;
+
 PROCEDURE UpdateMenuList(StartNode: Pointer);
 VAR
   Node: Pointer;
 BEGIN
   Node := StartNode;
   ClrScr;
+  WriteHelpBox;
   WriteMenuList(Node);
 END;
 
@@ -491,7 +531,7 @@ BEGIN
   CutOutNode^.Lvl := CurrNode^.Lvl;
 END;
 
-PROCEDURE OnPressedCtrlV(VAR CutOutNode, CurrNode: Pointer);
+PROCEDURE OnPressedEnter(VAR CutOutNode, CurrNode: Pointer);
 BEGIN
   IF CurrNode^.Father^.Val <> MY_COMPUTER
   THEN
@@ -504,15 +544,50 @@ BEGIN
     END;
 END;
 
+PROCEDURE MakeCopy(VAR CopyNode: Pointer; Ptr: Pointer);
+VAR
+  NewNode: Pointer;
+BEGIN
+  IF Ptr <> NIL
+  THEN  
+    BEGIN
+      NEW(NewNode);
+      NewNode := Ptr;
+      CopyNode := NewNode;
+      MakeCopy(CopyNode^.Left, Ptr^.Left);
+      MakeCopy(CopyNode^.Right, Ptr^.Right);
+    END;
+END;
+
+FUNCTION OnPressedF4(CurrNode: Pointer): Pointer;
+VAR
+  CopyNode: Pointer;
+BEGIN
+  IF CurrNode^.Father^.Val <> MY_COMPUTER
+  THEN
+    BEGIN
+      NEW(CopyNode);
+      CopyNode^.Val := CurrNode^.Val;
+      CopyNode^.Right := NIL;
+      CopyNode^.Left := NIL;
+      CopyNode^.Prev := NIL;
+      CopyNode^.Father := NIL;
+      CopyNode^.Lvl := CurrNode^.Lvl;
+      MakeCopy(CopyNode^.Left, CurrNode^.Left);
+      OnPressedF4 := CopyNode;
+    END;
+END;
+
 PROCEDURE TreeController(Root: Pointer);
 VAR
   Key: CHAR;
-  EndProgram, Cut, IsSave: BOOLEAN;
-  CurrNode, StartNode, CutOutNode: Pointer;
+  EndProgram, Cut, IsSave, Copy: BOOLEAN;
+  CurrNode, StartNode, CutOutNode, CopyNode: Pointer;
 BEGIN
   EndProgram := FALSE;
   Cut := FALSE;
   IsSave := FALSE;
+  Copy := FALSE;
   IF Root^.Left <> NIL
   THEN
     BEGIN
@@ -534,6 +609,15 @@ BEGIN
             #9 : OnPressedTab(CurrNode);
             #83: OnPressedDel(CurrNode, StartNode);
             #60: OnPressedF2(CurrNode);
+            #62: 
+              BEGIN 
+                IF Copy = FALSE
+                THEN
+                  BEGIN
+                    CopyNode := OnPressedF4(CurrNode);
+                    Copy := TRUE;
+                  END;
+              END;
             #24:
               BEGIN
                 IF Cut = FALSE
@@ -545,10 +629,16 @@ BEGIN
               END;
             #13: 
               BEGIN
+                IF Copy
+                THEN
+                  BEGIN
+                    OnPressedEnter(CopyNode, CurrNode);
+                    Copy := FALSE;
+                  END;             
                 IF Cut
                 THEN
                   BEGIN
-                    OnPressedCtrlV(CutOutNode, CurrNode);
+                    OnPressedEnter(CutOutNode, CurrNode);
                     Cut := FALSE;
                   END;
               END;
