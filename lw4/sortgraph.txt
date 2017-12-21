@@ -1,0 +1,230 @@
+PROGRAM AlgoritmPrima(INPUT, OUTPUT);
+{   20. Реализовать  алгоритм   Прима   нахождения   остовного 
+дерева и проиллюстрировать по шагам этапы его выполнения (10).
+
+                 Матюков Николай Юрьевич ПС-21
+}
+CONST
+  NO_FILE = 'Не указан исходный файл';
+  ERROR_OPEN_FILE = 'Ошибка открытия файла ';
+  SPACE = ' ';
+  FirstNodeInfo = 1;
+  SecondNodeInfo = 2;
+  NodeCost = 3;
+
+TYPE
+  InfoSize = 1..3;
+  NodeInfo = ARRAY [InfoSize] OF INTEGER;
+  NodePtr = ^Node;
+  Node = RECORD
+           Next, Prev: NodePtr;
+           Key: NodeInfo;
+         END;
+VAR
+  FirstPtr, NewPtr: NodePtr;
+  FIn, FOut: TEXT;
+
+PROCEDURE WriteStringInOut(Alert: STRING);
+BEGIN {WriteStringInOut}
+  WRITELN(Alert);
+  READLN;
+  Halt;
+END; {WriteStringInOut}
+
+PROCEDURE ErrorOpenFile(VAR FileName: STRING);
+BEGIN
+  IF IoResult <> 0 
+  THEN
+    WriteStringInOut(ERROR_OPEN_FILE + FileName);
+END;
+
+PROCEDURE CheckEnteredFile(VAR FIn, FOut:TEXT);
+VAR 
+  FileName: STRING;
+BEGIN {CheckEnteredFile}
+  IF ParamCount < 2
+  THEN
+    WriteStringInOut(NO_FILE)
+  ELSE
+    BEGIN
+      ASSIGN(FOut, ParamStr(2));
+      ASSIGN(FIn, ParamStr(1));
+    END;
+  FileName := ParamStr(1);
+  {$I-}
+  RESET(FIn);           
+  {$I+}  
+  ErrorOpenFile(FileName);
+  FileName := ParamStr(2);
+  {$I-}
+  REWRITE(FOut);
+  {$I+}
+  ErrorOpenFile(FileName);
+END; {CheckEnteredFile}
+
+PROCEDURE PrintGraphNodes(VAR FirstPtr: NodePtr);
+VAR
+  Ptr: NodePtr;
+  I: INTEGER;
+BEGIN
+  Ptr := FirstPtr;
+  WHILE Ptr <> NIL
+  DO
+    BEGIN
+	  FOR I := FirstNodeInfo TO NodeCost
+	  DO
+	    BEGIN
+	      IF I = SecondNodeInfo
+	      THEN
+	        WRITE(' -> ');
+	      IF I = NodeCost
+	      THEN
+	        WRITE(' Cost = ');
+	      WRITE(Ptr^.Key[I]);
+	    END;
+	  Ptr := Ptr^.Next;
+	  WRITELN
+    END
+END;
+
+PROCEDURE InsertNewNode(VAR NewPtr: NodePtr; VAR FirstPtr: NodePtr);
+VAR
+  CurrNode: NodePtr;
+  Found: BOOLEAN;
+	
+BEGIN
+  CurrNode := FirstPtr;
+  Found := FALSE;
+  WHILE (CurrNode^.Next <> NIL) AND NOT Found
+  DO
+    IF NewPtr^.Key[FirstNodeInfo] > CurrNode^.Key[FirstNodeInfo]
+    THEN
+	  CurrNode := CurrNode^.Next
+    ELSE
+	  Found := TRUE;
+  IF NewPtr^.Key[FirstNodeInfo] < CurrNode^.Key[FirstNodeInfo]
+  THEN
+    BEGIN
+      IF (CurrNode^.Prev <> NIL) AND (CurrNode^.Prev^.Next <> NIL)
+      THEN
+        BEGIN
+          CurrNode^.Prev^.Next := NewPtr;
+          NewPtr^.Prev := CurrNode^.Prev;
+        END;
+      NewPtr^.Next := CurrNode;
+      CurrNode^.Prev := NewPtr;
+    END
+  ELSE
+    BEGIN
+      IF (CurrNode^.Next <> NIL) AND (CurrNode^.Next^.Prev <> NIL)
+      THEN
+        BEGIN    
+          CurrNode^.Next^.Prev := NewPtr;
+          NewPtr^.Next := CurrNode^.Next;
+        END;
+      NewPtr^.Prev := CurrNode;
+      CurrNode^.Next := NewPtr;
+    END;
+  IF NewPtr^.Prev = NIL
+  THEN
+    FirstPtr := NewPtr;
+END;
+
+PROCEDURE CreateNewNodeConnection(Node: NodeInfo);
+BEGIN
+  NEW(NewPtr);
+  NewPtr^.Key := Node; 
+  NewPtr^.Prev := NIL;
+  NewPtr^.Next := NIL;
+END;
+
+PROCEDURE CheckIdentalNodes(VAR First: NodePtr; Node: NodeInfo; VAR IsIdental: BOOLEAN);
+VAR
+  CurrPtr: NodePtr;
+BEGIN
+  CurrPtr := NIL;
+  CurrPtr := First;
+  WHILE (CurrPtr <> NIL)
+  DO
+    BEGIN
+      IF ((CurrPtr^.Key[SecondNodeInfo] = Node[FirstNodeInfo])
+         AND (CurrPtr^.Key[FirstNodeInfo] = Node[SecondNodeInfo]))
+      THEN
+        BEGIN
+          IsIdental := TRUE;
+          IF (Node[FirstNodeInfo] < CurrPtr^.Key[FirstNodeInfo])
+          THEN
+            BEGIN
+	          IF (CurrPtr^.Next <> NIL) AND (CurrPtr^.Prev = NIL)
+	          THEN
+	            BEGIN
+	              CurrPtr^.Next^.Prev := NIL;
+	              FirstPtr := CurrPtr^.Next;
+	              CurrPtr^.Next := NIL;
+	              DISPOSE(CurrPtr);
+	            END;
+	          IF (CurrPtr^.Next = NIL) AND (CurrPtr^.Prev <> NIL)
+	          THEN
+	            BEGIN
+	              CurrPtr^.Prev^.Next := NIL;
+	              CurrPtr^.Prev := NIL;
+	              DISPOSE(CurrPtr);
+	            END;	
+	          IF (CurrPtr^.Next <> NIL) AND (CurrPtr^.Prev <> NIL)
+	          THEN
+	            BEGIN
+	              CurrPtr^.Next^.Prev := CurrPtr^.Prev;
+	              CurrPtr^.Prev^.Next := CurrPtr^.Next;
+	              DISPOSE(CurrPtr);
+	            END;
+              IsIdental := FALSE;  
+              Break;   
+            END;
+        END;
+      CurrPtr := CurrPtr^.Next;
+    END; 
+END;
+
+PROCEDURE ReadGraph(VAR FIn: TEXT);
+VAR
+  CurrNum, I: INTEGER;
+  IsFirst, IsIdental: BOOLEAN;
+  NodesInfo: NodeInfo;
+BEGIN
+  FirstPtr := NIL;
+  IsFirst := TRUE;
+  WHILE NOT EOF(FIn)
+  DO
+    BEGIN
+      I := 1;
+      IsIdental := FALSE;
+      WHILE NOT EOLN(FIn)
+      DO
+        BEGIN
+          READ(FIn, CurrNum);
+          NodesInfo[I] := CurrNum;
+          INC(I);
+        END;
+      CheckIdentalNodes(FirstPtr, NodesInfo, IsIdental);
+      IF NOT IsIdental
+      THEN
+        CreateNewNodeConnection(NodesInfo);
+      IF IsFirst
+      THEN
+        BEGIN
+          FirstPtr := NewPtr;
+          IsFirst := FALSE;
+        END
+      ELSE
+        IF NOT IsIdental
+        THEN
+          InsertNewNode(NewPtr, FirstPtr);
+      READLN(FIn);
+    END;
+  PrintGraphNodes(FirstPtr);
+END;
+
+BEGIN
+  CheckEnteredFile(FIn, FOut);
+  ReadGraph(FIn);
+END.

@@ -1,0 +1,340 @@
+PROGRAM AlgoritmPrima(INPUT, OUTPUT);
+{   20. Реализовать  алгоритм   Прима   нахождения   остовного 
+дерева и проиллюстрировать по шагам этапы его выполнения (10).
+
+                 Матюков Николай Юрьевич ПС-21
+}
+CONST
+  NO_FILE = 'Не указан исходный файл';
+  ERROR_OPEN_FILE = 'Ошибка открытия файла ';
+  SPACE = ' ';
+  FirstNodeInfo = 1;
+  SecondNodeInfo = 2;
+  NodeCost = 3;
+
+TYPE
+  InfoSize = 1..3;
+  NodeInfo = ARRAY [InfoSize] OF INTEGER;
+  NodePtr = ^Node;
+  Node = RECORD
+           Next, Prev: NodePtr;
+           Key: NodeInfo;
+         END;
+  TreePtr = ^Tree;
+  Tree = RECORD
+           Key: NodeInfo;
+           Next: TreePtr;
+           
+           Tag: BOOLEAN;
+         END;
+VAR
+  FirstPtr, NewPtr: NodePtr;
+  FIn, FOut: TEXT;
+  NodeCount: INTEGER;
+
+PROCEDURE WriteStringInOut(Alert: STRING);
+BEGIN {WriteStringInOut}
+  WRITELN(Alert);
+  READLN;
+  Halt;
+END; {WriteStringInOut}
+
+PROCEDURE ErrorOpenFile(VAR FileName: STRING);
+BEGIN
+  IF IoResult <> 0 
+  THEN
+    WriteStringInOut(ERROR_OPEN_FILE + FileName);
+END;
+
+PROCEDURE CheckEnteredFile(VAR FIn, FOut:TEXT);
+VAR 
+  FileName: STRING;
+BEGIN {CheckEnteredFile}
+  IF ParamCount < 2
+  THEN
+    WriteStringInOut(NO_FILE)
+  ELSE
+    BEGIN
+      ASSIGN(FOut, ParamStr(2));
+      ASSIGN(FIn, ParamStr(1));
+    END;
+  FileName := ParamStr(1);
+  {$I-}
+  RESET(FIn);           
+  {$I+}  
+  ErrorOpenFile(FileName);
+  FileName := ParamStr(2);
+  {$I-}
+  REWRITE(FOut);
+  {$I+}
+  ErrorOpenFile(FileName);
+END; {CheckEnteredFile}
+
+PROCEDURE PrintGraphNodes(VAR FirstPtr: NodePtr);
+VAR
+  Ptr: NodePtr;
+  I: INTEGER;
+BEGIN
+  Ptr := FirstPtr;
+  WHILE Ptr <> NIL
+  DO
+    BEGIN
+	  FOR I := FirstNodeInfo TO NodeCost
+	  DO
+	    BEGIN
+	      IF I = SecondNodeInfo
+	      THEN
+	        WRITE(' -> ');
+	      IF I = NodeCost
+	      THEN
+	        WRITE(' Cost = ');
+	      WRITE(Ptr^.Key[I]);
+	    END;
+	  Ptr := Ptr^.Next;
+	  WRITELN
+    END
+END;
+
+PROCEDURE InsertNewNode(VAR NewPtr: NodePtr; VAR FirstPtr: NodePtr; VAR NodeCount: INTEGER);
+VAR
+  CurrNode: NodePtr;
+  Found: BOOLEAN;
+	
+BEGIN
+  CurrNode := FirstPtr;
+  Found := FALSE;
+  WHILE (CurrNode^.Next <> NIL) AND NOT Found
+  DO
+    IF NewPtr^.Key[FirstNodeInfo] > CurrNode^.Key[FirstNodeInfo]
+    THEN
+	  CurrNode := CurrNode^.Next
+    ELSE
+	  Found := TRUE;
+  IF NewPtr^.Key[FirstNodeInfo] < CurrNode^.Key[FirstNodeInfo]
+  THEN
+    BEGIN
+      IF (CurrNode^.Prev <> NIL) AND (CurrNode^.Prev^.Next <> NIL)
+      THEN
+        BEGIN
+          CurrNode^.Prev^.Next := NewPtr;
+          NewPtr^.Prev := CurrNode^.Prev;
+        END;
+      NewPtr^.Next := CurrNode;
+      CurrNode^.Prev := NewPtr;
+    END
+  ELSE
+    BEGIN
+      IF (CurrNode^.Next <> NIL) AND (CurrNode^.Next^.Prev <> NIL)
+      THEN
+        BEGIN    
+          CurrNode^.Next^.Prev := NewPtr;
+          NewPtr^.Next := CurrNode^.Next;
+        END;
+      NewPtr^.Prev := CurrNode;
+      CurrNode^.Next := NewPtr;
+    END;
+  IF NewPtr^.Prev = NIL
+  THEN
+    FirstPtr := NewPtr;
+  IF (CurrNode^.Prev <> NIL) AND (NewPtr^.Key[FirstNodeInfo] <> CurrNode^.Key[FirstNodeInfo])
+  THEN
+    BEGIN
+      INC(NodeCount);
+    END;
+END;
+
+PROCEDURE CreateNewNodeConnection(Node: NodeInfo);
+BEGIN
+  NEW(NewPtr);
+  NewPtr^.Key := Node; 
+  NewPtr^.Prev := NIL;
+  NewPtr^.Next := NIL;
+END;
+
+PROCEDURE ReadGraph(VAR FIn: TEXT; VAR NodeCount: INTEGER);
+VAR
+  CurrNum, I: INTEGER;
+  IsFirst: BOOLEAN;
+  NodesInfo: NodeInfo;
+BEGIN
+  FirstPtr := NIL;
+  IsFirst := TRUE;
+  WHILE NOT EOF(FIn)
+  DO
+    BEGIN
+      I := 1;
+      WHILE NOT EOLN(FIn)
+      DO
+        BEGIN
+          READ(FIn, CurrNum);
+          NodesInfo[I] := CurrNum;
+          INC(I);
+        END;
+      CreateNewNodeConnection(NodesInfo);
+      IF IsFirst
+      THEN
+        BEGIN
+          FirstPtr := NewPtr;
+          IsFirst := FALSE;
+        END
+      ELSE
+        InsertNewNode(NewPtr, FirstPtr, NodeCount);
+      READLN(FIn);
+    END;
+  PrintGraphNodes(FirstPtr);
+END;
+
+PROCEDURE PrintTree(FirstTree: TreePtr);
+VAR
+  Ptr: TreePtr;
+BEGIN
+  Ptr := FirstTree;
+  WHILE Ptr <> NIL
+  DO
+    BEGIN
+      WRITE(Ptr^.Key[FirstNodeInfo], ' ');
+      WRITE(Ptr^.Key[SecondNodeInfo], ' ');
+      IF Ptr^.Next = NIL
+      THEN
+        WRITE('(', Ptr^.Key[NodeCost], ')')
+      ELSE
+        WRITE('(', Ptr^.Key[NodeCost], ')', ' | ');
+      Ptr := Ptr^.Next;
+    END;
+  WRITELN;
+END;
+
+PROCEDURE CreateTable(VAR Tree, FirstTree: TreePtr);
+VAR
+  IsFirstTreeNode: BOOLEAN;
+  I: INTEGER;
+  NewNode: TreePtr;
+BEGIN
+  IsFirstTreeNode := TRUE;
+  FOR I := 2 TO NodeCount
+  DO
+    BEGIN
+      NEW(NewNode);
+      IF (NOT IsFirstTreeNode)
+      THEN
+        Tree^.Next := NewNode;
+      NewNode^.Key[FirstNodeInfo] := MAXINT;
+      NewNode^.Key[SecondNodeInfo] := MAXINT;
+      NewNode^.Key[NodeCost] := MAXINT;
+      NewNode^.Tag := FALSE;
+      NewNode^.Next := NIL;
+      IsFirstTreeNode := FALSE;
+      Tree := NewNode;
+      IF I = 2
+      THEN
+        FirstTree := Tree;
+    END;
+  Tree := FirstTree;
+END;
+
+PROCEDURE GetNodeWithMinCostInTree(First: TreePtr; VAR Min: TreePtr);
+VAR
+  Ptr: TreePtr;
+BEGIN
+  Ptr := First;
+  Min := Ptr;
+  WHILE Ptr <> NIL
+  DO
+    BEGIN
+      IF (Ptr^.Key[NodeCost] < Min^.Key[NodeCost]) 
+      AND (Ptr^.Key[NodeCost] <> -1)
+      AND (NOT Ptr^.Tag)
+      THEN
+        BEGIN
+          Min := Ptr;
+          Min^.Tag := TRUE;
+        END;
+      Ptr := Ptr^.Next
+    END;
+END;
+
+PROCEDURE GetNodeWithMinCost(First: NodePtr; VAR Min: NodePtr; MinKey: NodeInfo);
+VAR
+  Ptr: NodePtr;
+BEGIN
+  Ptr := First;
+  WHILE Ptr <> NIL
+  DO
+    BEGIN
+      IF (Ptr^.Key[FirstNodeInfo] = MinKey[SecondNodeInfo])
+      THEN
+        BEGIN
+          Min := Ptr;
+          BREAK;
+        END;
+      Ptr := Ptr^.Next;
+    END;
+END;
+
+PROCEDURE GetOstovnyTree(FirstPtr: NodePtr);
+VAR
+  SetOfNodes: SET OF BYTE;
+  CurrCount, CurrNode: INTEGER;
+  Node, MinCost: NodePtr;
+  Tree, FirstTreeNode, NodeMinCost: TreePtr;
+BEGIN
+  //WRITELN('.i.');
+  FirstTreeNode := NIL;
+  Tree := NIL;
+  SetOfNodes := [];
+  Node := FirstPtr;
+  NodeMinCost := NIL;
+  CreateTable(Tree, FirstTreeNode);
+  CurrNode := Node^.Key[FirstNodeInfo];
+  WHILE NodeCount <> 1
+  DO
+    BEGIN
+      WHILE Node^.Key[FirstNodeInfo] = CurrNode
+      DO
+        BEGIN
+          IF Tree^.Tag
+          THEN
+            WHILE Tree^.Tag
+            DO
+              Tree := Tree^.Next;
+          IF Node^.Key[SecondNodeInfo] IN SetOfNodes
+          THEN
+            WHILE Node^.Key[SecondNodeInfo] IN SetOfNodes
+            DO
+              Node := Node^.Next;
+          IF NOT (Node^.Key[FirstNodeInfo] IN SetOfNodes)
+          THEN
+            BEGIN
+              INCLUDE(SetOfNodes, Node^.Key[FirstNodeInfo]);
+              WRITELN('Add Node Number = ', Node^.Key[FirstNodeInfo]);
+            END;
+          IF (Tree^.Key[NodeCost] > Node^.Key[NodeCost]) OR (Tree^.Key[NodeCost] = MAXINT)
+          THEN
+            BEGIN
+              Tree^.Key[FirstNodeInfo] := Node^.Key[FirstNodeInfo];
+              Tree^.Key[SecondNodeInfo] := Node^.Key[SecondNodeInfo];
+              Tree^.Key[NodeCost] := Node^.Key[NodeCost];
+            END;
+          Node := Node^.Next;
+          Tree := Tree^.Next;
+          PrintTree(FirstTreeNode);
+        END;
+      GetNodeWithMinCostInTree(FirstTreeNode, NodeMinCost);
+      GetNodeWithMinCost(FirstPtr, MinCost, NodeMinCost^.Key);
+      IF NOT (MinCost^.Key[FirstNodeInfo] IN SetOfNodes)
+      THEN 
+        BEGIN
+          Node := MinCost;
+          CurrNode := Node^.Key[FirstNodeInfo];
+        END;     
+      Tree := FirstTreeNode;
+      DEC(NodeCount);
+    END;
+END;
+
+BEGIN
+  NodeCount := 1;
+  CheckEnteredFile(FIn, FOut);
+  ReadGraph(FIn, NodeCount);
+  GetOstovnyTree(FirstPtr);
+END.
